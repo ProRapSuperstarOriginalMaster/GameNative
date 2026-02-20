@@ -826,6 +826,13 @@ object PrefManager {
             setPref(DOWNLOAD_SPEED, value)
         }
 
+    private val SD_CARD_CAP = booleanPreferencesKey("sd_card_cap")
+    var sdCardCap: Boolean
+        get() = getPref(SD_CARD_CAP, false)
+        set(value) {
+            setPref(SD_CARD_CAP, value)
+        }
+
     private val USE_EXTERNAL_STORAGE = booleanPreferencesKey("use_external_storage")
     var useExternalStorage: Boolean
         get() = getPref(USE_EXTERNAL_STORAGE, false)

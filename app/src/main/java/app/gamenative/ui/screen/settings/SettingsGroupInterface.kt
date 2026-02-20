@@ -591,6 +591,20 @@ fun SettingsGroupInterface(
                 sm.getStorageVolume(dir)?.getDescription(ctx) ?: dir.name
             }
         }
+
+        var sdCardCap by rememberSaveable {mutableStateOf(PrefManager.sdCardCap) }
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_subtitle)) },
+            state = sdCardCap,
+            onCheckedChange = {
+                sdCardCap = it
+                PrefManager.sdCardCap = it
+            }
+
+        )
+
         var useExternalStorage by rememberSaveable { mutableStateOf(PrefManager.useExternalStorage) }
         SettingsSwitch(
             colors = settingsTileColorsAlt(),

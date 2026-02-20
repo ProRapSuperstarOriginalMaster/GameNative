@@ -1477,33 +1477,67 @@ class SteamService : Service(), IChallengeUrlChanged {
                         // And to have maximum throughput, set downloadRatio = decompressRatio = 1.0 x CPU Cores
                         var downloadRatio = 0.0
                         var decompressRatio = 0.0
+                        var DownloadThreads = 1
+                        var DecompressThreads = 1
 
-                        when (PrefManager.downloadSpeed) {
-                            8 -> {
-                                downloadRatio = 0.6
-                                decompressRatio = 0.2
+                        if (!PrefManager.sdCardCap) {
+                            when (PrefManager.downloadSpeed) {
+                                8 -> {
+                                    downloadRatio = 0.6
+                                    decompressRatio = 0.2
+                                }
+
+                                16 -> {
+                                    downloadRatio = 1.2
+                                    decompressRatio = 0.4
+                                }
+
+                                24 -> {
+                                    downloadRatio = 1.5
+                                    decompressRatio = 0.5
+                                }
+
+                                32 -> {
+                                    downloadRatio = 2.4
+                                    decompressRatio = 0.8
+                                }
+
                             }
-                            16 -> {
-                                downloadRatio = 1.2
-                                decompressRatio = 0.4
+
+                            val cpuCores = Runtime.getRuntime().availableProcessors()
+                            DownloadThreads = (cpuCores * downloadRatio).toInt().coerceAtLeast(1)
+                            DecompressThreads = (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
+
+                            Timber.i("CPU Cores: $cpuCores")
+                            Timber.i("No cap")
+                        } else {
+                            when (PrefManager.downloadSpeed) { // Caps decompression at 1 and lowering download threads to avoid I/O jam
+                                8 -> {
+                                    DownloadThreads = 1
+                                    DecompressThreads = 1
+                                }
+
+                                16 -> {
+                                    DownloadThreads = 2
+                                    DecompressThreads = 1
+                                }
+
+                                24 -> {
+                                    DownloadThreads = 3
+                                    DecompressThreads = 1
+                                }
+
+                                32 -> {
+                                    DownloadThreads = 4
+                                    DecompressThreads = 1
+                                }
                             }
-                            24 -> {
-                                downloadRatio = 1.5
-                                decompressRatio = 0.5
-                            }
-                            32 -> {
-                                downloadRatio = 2.4
-                                decompressRatio = 0.8
-                            }
+                            Timber.i("Cap")
                         }
-
-                        val cpuCores = Runtime.getRuntime().availableProcessors()
-                        val maxDownloads = (cpuCores * downloadRatio).toInt().coerceAtLeast(1)
-                        val maxDecompress = (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
-
-                        Timber.i("CPU Cores: $cpuCores")
-                        Timber.i("maxDownloads: $maxDownloads")
-                        Timber.i("maxDecompress: $maxDecompress")
+                        Timber.i("maxDownloads: $DownloadThreads")
+                        Timber.i("maxDecompress: $DecompressThreads")
+                        val maxDownloads = DownloadThreads
+                        val maxDecompress = DecompressThreads
 
                         // Create DepotDownloader instance
                         val depotDownloader = DepotDownloader(
