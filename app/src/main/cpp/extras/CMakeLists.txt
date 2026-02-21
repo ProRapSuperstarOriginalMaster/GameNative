@@ -17,3 +17,8 @@ target_link_libraries(extras
         GLESv2
         GLESv3
         adrenotools)
+
+# Standalone FS_IOC_GETFLAGS shim — fixes ~4-min black-screen launch delay on Android FUSE storage.
+# Built separately so it can be preloaded without pulling in SDL or other extras dependencies.
+add_library(fsfix SHARED fsfix.c)
+target_link_libraries(fsfix dl)

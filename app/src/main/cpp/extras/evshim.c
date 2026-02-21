@@ -257,6 +257,10 @@ int ioctl(int fd, int req, ...) __attribute__((visibility("default")));
 int ioctl(int fd, int req, ...)
 {
     if (!real_ioctl) real_ioctl = (ioctl_f)dlsym(RTLD_NEXT, "ioctl");
+    /* FS_IOC_GETFLAGS (_IOR('f',1,long) = 0x80086601) is blocked with EPERM on Android FUSE
+     * storage.  Wine mistakes EPERM for a recoverable error and retries for ~4 minutes.
+     * Returning ENOTTY ("not supported") causes Wine to skip inotify immediately. */
+    if ((unsigned long)req == 0x80086601UL /* FS_IOC_GETFLAGS */) { errno = ENOTTY; return -1; }
     char linkbuf[64], path[64];
     snprintf(linkbuf, sizeof linkbuf, "/proc/self/fd/%d", fd);
     ssize_t n = readlink(linkbuf, path, sizeof path - 1);

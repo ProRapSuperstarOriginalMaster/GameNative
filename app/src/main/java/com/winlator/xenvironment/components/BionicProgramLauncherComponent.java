@@ -298,6 +298,14 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         ld_preload += ":" + evshimPath;
         ld_preload += ":" + replacePath;
 
+        // Inject fsfix shim (FS_IOC_GETFLAGS → ENOTTY) to fix ~4-min black-screen on FUSE storage.
+        // libfsfix.so is built by the Android NDK and lives in the APK's native-library directory,
+        // so no rootfs copy is needed — Box64 can load it directly from the Android path.
+        String fsfixApkPath = context.getApplicationInfo().nativeLibraryDir + "/libfsfix.so";
+        if (new File(fsfixApkPath).exists()) {
+            ld_preload += ":" + fsfixApkPath;
+        }
+
         envVars.put("LD_PRELOAD", ld_preload);
 
         envVars.put("EVSHIM_SHM_NAME", "controller-shm0");
