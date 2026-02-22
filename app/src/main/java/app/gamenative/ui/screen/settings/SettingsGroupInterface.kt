@@ -592,20 +592,8 @@ fun SettingsGroupInterface(
             }
         }
 
-        var sdCardCap by rememberSaveable {mutableStateOf(PrefManager.sdCardCap) }
-        SettingsSwitch(
-            colors = settingsTileColorsAlt(),
-            title = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_title)) },
-            subtitle = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_subtitle)) },
-            state = sdCardCap,
-            onCheckedChange = {
-                sdCardCap = it
-                PrefManager.sdCardCap = it
-            }
-
-        )
-
         var useExternalStorage by rememberSaveable { mutableStateOf(PrefManager.useExternalStorage) }
+        var sdCardCap by rememberSaveable {mutableStateOf(PrefManager.sdCardCap)}
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             enabled  = dirs.isNotEmpty(),
@@ -620,11 +608,28 @@ fun SettingsGroupInterface(
             onCheckedChange = {
                 useExternalStorage = it
                 PrefManager.useExternalStorage = it
+
                 if (it && dirs.isNotEmpty()) {
                     PrefManager.externalStoragePath = dirs[0].absolutePath
+                    PrefManager.sdCardCap = it
+                    sdCardCap = true
                 }
             },
         )
+
+        if (useExternalStorage) {
+            SettingsSwitch(
+                colors = settingsTileColorsAlt(),
+                title = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_title)) },
+                subtitle = { Text(text = stringResource(R.string.settings_interface_sd_card_cap_subtitle)) },
+                state = sdCardCap,
+                onCheckedChange = {
+                    sdCardCap = it
+                    PrefManager.sdCardCap = it
+                }
+            )
+        }
+
         if (useExternalStorage) {
             // Currently selected item
             var selectedIndex by rememberSaveable {

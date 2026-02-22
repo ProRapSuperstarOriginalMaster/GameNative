@@ -830,6 +830,7 @@ object PrefManager {
     var sdCardCap: Boolean
         get() = getPref(SD_CARD_CAP, false)
         set(value) {
+            Timber.d("Setting SD_CARD_CAP to $value")
             setPref(SD_CARD_CAP, value)
         }
 

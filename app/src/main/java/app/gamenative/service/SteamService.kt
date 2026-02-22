@@ -1501,8 +1501,8 @@ class SteamService : Service(), IChallengeUrlChanged {
                         }
 
                         val cpuCores = Runtime.getRuntime().availableProcessors()
-                        val maxDownloads = if (PrefManager.sdCardCap) (PrefManager.downloadSpeed/8).coerceAtLeast(1) else (cpuCores * downloadRatio).toInt().coerceAtLeast(1)
-                        val maxDecompress = if (PrefManager.sdCardCap) 1 else (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
+                        val maxDownloads = (cpuCores * downloadRatio).toInt().coerceAtLeast(1)
+                        val maxDecompress = if (PrefManager.sdCardCap && PrefManager.useExternalStorage) 2 else (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
 
                         Timber.i("CPU Cores: $cpuCores")
                         Timber.i("maxDownloads: $maxDownloads")
