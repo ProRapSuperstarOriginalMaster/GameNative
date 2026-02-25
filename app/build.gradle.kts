@@ -51,6 +51,7 @@ android {
     }
 
     defaultConfig {
+        manifestPlaceholders += mapOf()
         applicationId = "app.gamenative"
 
         minSdk = 26
@@ -108,6 +109,11 @@ android {
             getDefaultProguardFile("proguard-android.txt"),
             "proguard-rules.pro",
         )
+        externalNativeBuild {
+            cmake {
+                cppFlags += ""
+            }
+        }
     }
 
     buildTypes {
@@ -177,6 +183,12 @@ android {
         }
     }
     dynamicFeatures += setOf(":ubuntufs")
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/wilhelm/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 
     kotlinter {
         ignoreFormatFailures  = false
@@ -189,6 +201,13 @@ android {
     //         version = "3.22.1"
     //     }
     // }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/wilhelm/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 
     // cmake on release builds a proot that fails to process ld-2.31.so
     // externalNativeBuild {

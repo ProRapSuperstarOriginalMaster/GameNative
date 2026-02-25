@@ -298,6 +298,11 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         ld_preload += ":" + evshimPath;
         ld_preload += ":" + replacePath;
 
+        String fsfixApkPath = context.getApplicationInfo().nativeLibraryDir + "/libfsfix.so";
+        if (new File(fsfixApkPath).exists()) {
+            ld_preload += ":" + fsfixApkPath;
+        }
+
         envVars.put("LD_PRELOAD", ld_preload);
 
         envVars.put("EVSHIM_SHM_NAME", "controller-shm0");
