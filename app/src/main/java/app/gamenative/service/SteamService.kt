@@ -745,6 +745,14 @@ class SteamService : Service(), IChallengeUrlChanged {
             return internalPath.pathString
         }
 
+        // Simple copy of aforementioned function just for consistency, can probably be simplified
+        fun getAppDlPath(gameId: Int): String {
+            Timber.w("Getting app dl path")
+            val info = getAppInfoOf(gameId)
+            val appName = getAppDirName(info)
+            return Paths.get(internalAppStagingPath, appName).pathString
+        }
+
         private fun isExecutable(flags: Any): Boolean = when (flags) {
             // SteamKit-JVM (most forks) – flags is EnumSet<EDepotFileFlag>
             is EnumSet<*> -> {
@@ -974,6 +982,15 @@ class SteamService : Service(), IChallengeUrlChanged {
                         }
                     }
                 }
+            }
+
+            // Some notes:
+            // This is a little hacky right now. If storage management changes significantly this will break
+            // However right now it's not possible to manage an externally installed game without the setting being active
+            // So deleting a separate staging path only ever becomes relevant if you're on external storage
+            if (PrefManager.useExternalStorage) {
+                val appName = getAppDirName(getAppInfoOf(appId))
+                File(internalAppStagingPath, appName).deleteRecursively()
             }
 
             val appDirPath = getAppDirPath(appId)
@@ -1473,10 +1490,9 @@ class SteamService : Service(), IChallengeUrlChanged {
                         }
 
                         // Some notes here:
-                        // Write should always be 1 in mobile device, as normally it does not use a SSD for storage
-                        // And to have maximum throughput, set downloadRatio = decompressRatio = 1.0 x CPU Cores
-                        //Update: This does not seem to hold true for external storage, and especially SD cards
-                        //Initial testing seems to indicate decompress should be one thread only, and download threads only slightly higher
+                        // Internal storage which should be UFS is fast and does well with parallel I/O operations
+                        // External storage however is not fast and gets jammed with more than thread at a time
+                        // Max downloads ought to be kept variable as there's no one size fits all solution
 
                         var downloadRatio = 0.0
                         var decompressRatio = 0.0
@@ -1502,7 +1518,7 @@ class SteamService : Service(), IChallengeUrlChanged {
 
                         val cpuCores = Runtime.getRuntime().availableProcessors()
                         val maxDownloads = (cpuCores * downloadRatio).toInt().coerceAtLeast(1)
-                        val maxDecompress = if (PrefManager.sdCardCap && PrefManager.useExternalStorage) 2 else (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
+                        val maxDecompress = if (PrefManager.sdCardCap && PrefManager.useExternalStorage) 1 else (cpuCores * decompressRatio).toInt().coerceAtLeast(1)
 
                         Timber.i("CPU Cores: $cpuCores")
                         Timber.i("maxDownloads: $maxDownloads")
@@ -1534,6 +1550,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                                 appId,
                                 installDirectory = getAppDirPath(appId),
                                 depot = mainAppDepotIds,
+                                downloadDirectory = getAppDlPath(appId),
                             )
 
                             // Add item to downloader
@@ -1548,7 +1565,8 @@ class SteamService : Service(), IChallengeUrlChanged {
                             val dlcAppItem = AppItem(
                                 dlcAppId,
                                 installDirectory = getAppDirPath(appId),
-                                depot = dlcDepotIds
+                                depot = dlcDepotIds,
+                                downloadDirectory = getAppDlPath(appId),
                             )
 
                             depotDownloader.add(dlcAppItem)
