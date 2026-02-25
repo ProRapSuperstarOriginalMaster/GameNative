@@ -109,11 +109,6 @@ android {
             getDefaultProguardFile("proguard-android.txt"),
             "proguard-rules.pro",
         )
-        externalNativeBuild {
-            cmake {
-                cppFlags += ""
-            }
-        }
     }
 
     buildTypes {
@@ -183,12 +178,7 @@ android {
         }
     }
     dynamicFeatures += setOf(":ubuntufs")
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/wilhelm/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
+
 
     kotlinter {
         ignoreFormatFailures  = false
