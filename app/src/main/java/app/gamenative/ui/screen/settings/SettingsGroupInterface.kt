@@ -613,6 +613,9 @@ fun SettingsGroupInterface(
                     PrefManager.externalStoragePath = dirs[0].absolutePath
                     PrefManager.sdCardCap = it
                     sdCardCap = true
+                } else {
+                    PrefManager.sdCardCap = false
+                    sdCardCap = false
                 }
             },
         )
