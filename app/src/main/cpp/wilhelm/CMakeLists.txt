@@ -26,4 +26,4 @@ project("gamenative")
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
 add_library(fsfix SHARED fsfix.c)
-target_link_libraries(fsfix dl)
+target_link_libraries(fsfix dl log)

@@ -21,20 +21,27 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <linux/fs.h>
+#include <android/log.h>
 
-#ifndef FS_IOC_GETFLAGS
-/* _IOR('f', 1, long): sizeof(long)==8 on aarch64 and x86-64 → 0x80086601 */
-#define FS_IOC_GETFLAGS 0x80086601UL
-#endif
+#undef FS_IOC_GETFLAGS
+#define FS_IOC_GETFLAGS 0x7201UL
 
 typedef int (*ioctl_f)(int, int, ...);
 static ioctl_f real_ioctl;
+
+__attribute__((constructor))
+void fsfix_init(void) {
+    __android_log_print(ANDROID_LOG_DEBUG, "fsfix", "fsfix shim loaded :D");
+}
 
 __attribute__((visibility("default")))
 int ioctl(int fd, int req, ...)
 {
     if ((unsigned long)req == (unsigned long)FS_IOC_GETFLAGS) {
         errno = ENOTTY;
+
+        __android_log_print(ANDROID_LOG_DEBUG, "fsfix", "intercepted FS_IOC_GETFLAGS");
+
         return -1;
     }
     if (!real_ioctl)
