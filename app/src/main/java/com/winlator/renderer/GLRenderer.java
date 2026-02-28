@@ -61,7 +61,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private int sceneTextureId = 0;
     private int sceneWidth = 0;
     private int sceneHeight = 0;
-    private boolean sgsrEnabled = true;
+    private volatile boolean sgsrEnabled = true;
 
     public GLRenderer(XServerView xServerView, XServer xServer) {
         this.xServerView = xServerView;
@@ -230,16 +230,29 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         }
 
         // === SGSR path ===
+        if (sgsrEnabled) {
+            // Lazily create the FBO on the GL thread (safe to call here).
+            if (sceneFboId == 0) {
+                createOrResizeSceneFbo(xServer.screenInfo.width, xServer.screenInfo.height);
+            }
+        }
         if (sgsrEnabled && sceneFboId != 0) {
+            // The scissor rect was set in screen coordinates above; it must not
+            // apply to the offscreen FBO (which lives in scene coordinates).
+            // Disable it unconditionally before any FBO operations.
+            GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+
             // Step 1: render scene into offscreen FBO
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, sceneFboId);
             GLES20.glViewport(0, 0, sceneWidth, sceneHeight);
+            // Clear with opaque black so transparent texels don't read as extreme
+            // dark edges by the SGSR sharpening pass.
+            GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+            GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // restore global clear colour
 
             renderWindows();
             if (cursorVisible) renderCursor();
-
-            if (!magnifierEnabled && !fullscreen) GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
 
             // Step 2: run SGSR pass to the real screen
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
@@ -514,10 +527,10 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     }
 
     public void setSgsrEnabled(boolean enabled) {
+        // Safe to write from any thread: the field is volatile, and the GL thread
+        // only reads it during drawFrame(). FBO creation (GL work) happens lazily
+        // inside drawFrame() on the GL thread when sgsrEnabled flips to true.
         sgsrEnabled = enabled;
-        if (enabled && sceneFboId == 0) {
-            createOrResizeSceneFbo(xServer.screenInfo.width, xServer.screenInfo.height);
-        }
         xServerView.requestRender();
     }
 }

@@ -429,6 +429,7 @@ fun XServerScreen(
         PluviaApp.isOverlayPaused = true
         keyboardRequestedFromOverlay = false
 
+        val currentSgsrEnabled = container.getExtra("sgsrEnabled", "true").toBoolean()
         val navDialog = NavigationDialog(
             context,
             object : NavigationDialog.NavigationListener {
@@ -564,6 +565,13 @@ fun XServerScreen(
                             showPhysicalControllerDialog = true
                         }
 
+                        NavigationDialog.ACTION_TOGGLE_SGSR -> {
+                            val newSgsrEnabled = !currentSgsrEnabled
+                            xServerView?.renderer?.setSgsrEnabled(newSgsrEnabled)
+                            container.putExtra("sgsrEnabled", newSgsrEnabled.toString())
+                            container.saveData()
+                        }
+
                         NavigationDialog.ACTION_EXIT_GAME -> {
                             if (currentAppInfo != null) {
                                 PostHog.capture(
@@ -584,7 +592,8 @@ fun XServerScreen(
                         }
                     }
                 }
-            }
+            },
+            currentSgsrEnabled,
         )
         // Resume game when the overlay closes via back press, outside tap, or any non-exit item.
         navDialog.setOnDismissListener {
@@ -737,6 +746,7 @@ fun XServerScreen(
                 xServerView = this
                 val renderer = this.renderer
                 renderer.isCursorVisible = false
+                renderer.setSgsrEnabled(container.getExtra("sgsrEnabled", "true").toBoolean())
                 getxServer().renderer = renderer
                 PluviaApp.touchpadView = TouchpadView(context, getxServer(), PrefManager.getBoolean("capture_pointer_on_external_mouse", true))
                 frameLayout.addView(PluviaApp.touchpadView)

@@ -29,12 +29,13 @@ public class NavigationDialog extends ContentDialog {
     public static final int ACTION_EXIT_GAME = 3;
     public static final int ACTION_EDIT_CONTROLS = 4;
     public static final int ACTION_EDIT_PHYSICAL_CONTROLLER = 5;
+    public static final int ACTION_TOGGLE_SGSR = 6;
 
     public interface NavigationListener {
         void onNavigationItemSelected(int itemId);
     }
 
-    public NavigationDialog(@NonNull Context context, NavigationListener listener) {
+    public NavigationDialog(@NonNull Context context, NavigationListener listener, boolean sgsrEnabled) {
         super(context, R.layout.navigation_dialog);
         if (getWindow() != null) {
             getWindow().setBackgroundDrawableResource(R.drawable.navigation_dialog_background);
@@ -62,6 +63,10 @@ public class NavigationDialog extends ContentDialog {
         if (hasPhysicalController) {
             addMenuItem(context, grid, R.drawable.icon_gamepad, R.string.edit_physical_controller, ACTION_EDIT_PHYSICAL_CONTROLLER, listener, 1.0f);
         }
+        // SGSR toggle: full opacity when on, dimmed when off so the user can tell the state at a glance.
+        int sgsrLabelRes = sgsrEnabled ? R.string.sgsr_on : R.string.sgsr_off;
+        float sgsrAlpha = sgsrEnabled ? 1.0f : 0.5f;
+        addMenuItem(context, grid, R.drawable.icon_magnifier, sgsrLabelRes, ACTION_TOGGLE_SGSR, listener, sgsrAlpha);
         addMenuItem(context, grid, R.drawable.icon_exit, R.string.exit_game, ACTION_EXIT_GAME, listener, 1.0f);
     }
 
