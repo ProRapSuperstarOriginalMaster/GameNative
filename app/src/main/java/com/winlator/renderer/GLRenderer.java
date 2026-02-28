@@ -12,6 +12,7 @@ import app.gamenative.R;
 import com.winlator.math.Mathf;
 import com.winlator.math.XForm;
 import com.winlator.renderer.material.CursorMaterial;
+import com.winlator.renderer.material.SGSRMaterial;
 import com.winlator.renderer.material.ShaderMaterial;
 import com.winlator.renderer.material.WindowMaterial;
 import com.winlator.widget.XServerView;
@@ -38,6 +39,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private final float[] tmpXForm2 = XForm.getInstance();
     private final CursorMaterial cursorMaterial = new CursorMaterial();
     private final WindowMaterial windowMaterial = new WindowMaterial();
+    private final SGSRMaterial sgsrMaterial = new SGSRMaterial();
     public final ViewTransformation viewTransformation = new ViewTransformation();
     private final Drawable rootCursorDrawable;
     private final ArrayList<RenderableWindow> renderableWindows = new ArrayList<>();
@@ -53,6 +55,13 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private int surfaceWidth;
     private int surfaceHeight;
     private boolean sceneInitialized = false;
+
+    // SGSR offscreen framebuffer state
+    private int sceneFboId = 0;
+    private int sceneTextureId = 0;
+    private int sceneWidth = 0;
+    private int sceneHeight = 0;
+    private boolean sgsrEnabled = true;
 
     public GLRenderer(XServerView xServerView, XServer xServer) {
         this.xServerView = xServerView;
@@ -84,15 +93,20 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         try (XLock lock = xServer.lock(XServer.Lockable.DRAWABLE_MANAGER)) {
-            // iterate all known drawables; if you don't have a central list,
-            // call this during updateScene() for each window's content.
-            android.util.SparseArray<Drawable> sa = xServer.drawableManager.all(); // adjust type if needed
+            android.util.SparseArray<Drawable> sa = xServer.drawableManager.all();
             for (int i = 0; i < sa.size(); i++) {
                 Drawable d = sa.valueAt(i);
-                if (d != null) d.getTexture().invalidate(); // sets textureId=0 so next draw re-creates
+                if (d != null) d.getTexture().invalidate();
             }
             rootCursorDrawable.getTexture().invalidate();
         }
+
+        // Reset FBO state on surface recreate (e.g. app resume)
+        sceneFboId = 0;
+        sceneTextureId = 0;
+        sceneWidth = 0;
+        sceneHeight = 0;
+
         updateScene();
         xServerView.requestRender();
     }
@@ -112,6 +126,50 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         surfaceHeight = height;
         viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
         viewportNeedsUpdate = true;
+
+        if (sgsrEnabled) {
+            createOrResizeSceneFbo(xServer.screenInfo.width, xServer.screenInfo.height);
+        }
+    }
+
+    private void createOrResizeSceneFbo(int width, int height) {
+        if (sceneWidth == width && sceneHeight == height) return;
+        sceneWidth = width;
+        sceneHeight = height;
+
+        // Clean up old resources if they exist
+        if (sceneFboId != 0) {
+            GLES20.glDeleteFramebuffers(1, new int[]{sceneFboId}, 0);
+            GLES20.glDeleteTextures(1, new int[]{sceneTextureId}, 0);
+            sceneFboId = 0;
+            sceneTextureId = 0;
+        }
+
+        // Create the color texture
+        int[] ids = new int[1];
+        GLES20.glGenTextures(1, ids, 0);
+        sceneTextureId = ids[0];
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, sceneTextureId);
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, width, height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+
+        // Create the FBO and attach the texture
+        GLES20.glGenFramebuffers(1, ids, 0);
+        sceneFboId = ids[0];
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, sceneFboId);
+        GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, sceneTextureId, 0);
+
+        int status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
+        if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+            android.util.Log.e("GLRenderer", "Scene FBO incomplete: " + status + ", disabling SGSR");
+            sgsrEnabled = false;
+        }
+
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
     }
 
     @Override
@@ -137,8 +195,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             viewportNeedsUpdate = false;
         }
 
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-
+        // Transform logic is unchanged — must run before renderWindows() regardless of SGSR
         if (magnifierEnabled) {
             float pointerX = 0;
             float pointerY = 0;
@@ -172,10 +229,38 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             else XForm.identity(tmpXForm2);
         }
 
-        renderWindows();
-        if (cursorVisible) renderCursor();
+        // === SGSR path ===
+        if (sgsrEnabled && sceneFboId != 0) {
+            // Step 1: render scene into offscreen FBO
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, sceneFboId);
+            GLES20.glViewport(0, 0, sceneWidth, sceneHeight);
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
-        if (!magnifierEnabled && !fullscreen) GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+            renderWindows();
+            if (cursorVisible) renderCursor();
+
+            if (!magnifierEnabled && !fullscreen) GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+
+            // Step 2: run SGSR pass to the real screen
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+            GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight);
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+            sgsrMaterial.apply(sceneTextureId, sceneWidth, sceneHeight, surfaceWidth, surfaceHeight);
+            quadVertices.bind(sgsrMaterial.programId);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, quadVertices.count());
+            quadVertices.disable();
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+
+        // === Original path (SGSR disabled or FBO not ready) ===
+        } else {
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+            renderWindows();
+            if (cursorVisible) renderCursor();
+
+            if (!magnifierEnabled && !fullscreen) GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+        }
 
         if (xrFrame) {
             // XrActivity.getInstance().endFrame();
@@ -421,6 +506,18 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     public void setMagnifierZoom(float magnifierZoom) {
         this.magnifierZoom = magnifierZoom;
+        xServerView.requestRender();
+    }
+
+    public boolean isSgsrEnabled() {
+        return sgsrEnabled;
+    }
+
+    public void setSgsrEnabled(boolean enabled) {
+        sgsrEnabled = enabled;
+        if (enabled && sceneFboId == 0) {
+            createOrResizeSceneFbo(xServer.screenInfo.width, xServer.screenInfo.height);
+        }
         xServerView.requestRender();
     }
 }
