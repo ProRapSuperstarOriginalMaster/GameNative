@@ -487,7 +487,7 @@ internal fun AppScreenContent(
     val hasInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     val wifiConnected = capabilities?.run {
         hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-            hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     } == true
     val wifiAllowed = !PrefManager.downloadOnWifiOnly || wifiConnected
     val scrollState = rememberScrollState()
@@ -496,6 +496,8 @@ internal fun AppScreenContent(
 
     // Focus requesters for gamepad navigation
     val playButtonFocusRequester = remember { FocusRequester() }
+
+    val isSleeping by remember { mutableStateOf(false) }
 
     // Calculate parallax offset based on scroll
     val parallaxOffset = scrollState.value * 0.5f
@@ -511,6 +513,8 @@ internal fun AppScreenContent(
     // Button state calculations (needed by key event handler)
     val isResume = !isDownloading && hasPartialDownload
     val pauseResumeEnabled = if (isResume) wifiAllowed else true
+    val isSleep = isSleeping
+    val sleepWakeEnabled = if (!isSleep) isDownloading else true
     val isInstall = !isInstalled
     val installEnabled = if (isInstall) wifiAllowed && hasInternet else true
     val buttonEnabled = if (isInstalled) {
@@ -534,9 +538,9 @@ internal fun AppScreenContent(
     // Download progress texts hoisted here so they can be shown inside the button
     val downloadStatusMessageFlow = remember(downloadInfo) { downloadInfo?.getStatusMessageFlow() }
     val downloadStatusMessage by (
-        downloadStatusMessageFlow?.collectAsState(initial = downloadStatusMessageFlow.value)
-            ?: remember { mutableStateOf<String?>(null) }
-    )
+            downloadStatusMessageFlow?.collectAsState(initial = downloadStatusMessageFlow.value)
+                ?: remember { mutableStateOf<String?>(null) }
+            )
     val downloadingLabel = stringResource(R.string.downloading)
     val downloadTimeLeftText = remember(displayInfo.appId, downloadProgress, downloadInfo, downloadStatusMessage) {
         val etaMs = downloadInfo?.getEstimatedTimeRemaining()
