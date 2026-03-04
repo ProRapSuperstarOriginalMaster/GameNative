@@ -214,10 +214,10 @@ dependencies {
     implementation("androidx.browser:browser:1.8.0")
 
     // JavaSteam
-    val localBuild = false // Change to 'true' needed when building JavaSteam manually
+    val localBuild = true // Change to 'true' needed when building JavaSteam manually
     if (localBuild) {
-        implementation(files("../../JavaSteam/build/libs/javasteam-1.8.0-11-SNAPSHOT.jar"))
-        implementation(files("../../JavaSteam/javasteam-depotdownloader/build/libs/javasteam-depotdownloader-1.8.0-11-SNAPSHOT.jar"))
+        implementation(files("../../JavaSteam/build/libs/javasteam-1.8.0-12-SNAPSHOT.jar"))
+        implementation(files("../../JavaSteam/javasteam-depotdownloader/build/libs/javasteam-depotdownloader-1.8.0-12-SNAPSHOT.jar"))
         implementation(libs.bundles.javasteam.dev)
     } else {
         implementation(libs.javasteam) {
